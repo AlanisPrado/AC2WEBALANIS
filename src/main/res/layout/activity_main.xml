@@ -48,6 +48,11 @@
         android:layout_height="48dp"
         android:text="Salvar"/>
 
+    <Spinner
+        android:id="@+id/spFiltroCategoria"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"/>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerReceitas"
         android:layout_width="match_parent"
