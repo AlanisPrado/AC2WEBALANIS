@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "665347055726",
+    "project_id": "ac2web-1cef0",
+    "storage_bucket": "ac2web-1cef0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:665347055726:android:56fdfc90a58a7bd07f467f",
+        "android_client_info": {
+          "package_name": "com.aula.ac2web"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA39m5xEiJmMA-ZGVNMlIWbFA1SbTReYaM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
