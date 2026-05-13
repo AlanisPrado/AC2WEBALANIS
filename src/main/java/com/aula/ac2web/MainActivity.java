@@ -1,20 +1,21 @@
-package com.aula.ac2web;
+package com.example.ac2web;
 
 import android.os.Bundle;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.Spinner;
+import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
-
-import android.os.Bundle;
-import android.widget.*;
-
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
@@ -24,20 +25,30 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity {
 
     EditText edtNome, edtTempo, edtIngredientes;
-    Spinner spCategoria, spDificuldade;
+
+    Spinner spCategoria, spDificuldade, spFiltroCategoria;
+
     CheckBox checkFavorita;
+
     Button btnSalvar;
 
     RecyclerView recyclerView;
 
     ArrayList<Receita> lista;
+
     ReceitaAdapter adapter;
 
     FirebaseFirestore db;
 
+    String idSelecionado = "";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
+
+        FirebaseApp.initializeApp(this);
+
         setContentView(R.layout.activity_main);
 
         edtNome = findViewById(R.id.edtNome);
@@ -46,6 +57,7 @@ public class MainActivity extends AppCompatActivity {
 
         spCategoria = findViewById(R.id.spCategoria);
         spDificuldade = findViewById(R.id.spDificuldade);
+        spFiltroCategoria = findViewById(R.id.spFiltroCategoria);
 
         checkFavorita = findViewById(R.id.checkFavorita);
 
@@ -57,28 +69,110 @@ public class MainActivity extends AppCompatActivity {
 
         lista = new ArrayList<>();
 
-        adapter = new ReceitaAdapter(lista);
+        adapter = new ReceitaAdapter(lista, new ReceitaAdapter.OnReceitaClick() {
+
+            @Override
+            public void onClick(Receita receita) {
+
+                idSelecionado = receita.getId();
+
+                edtNome.setText(receita.getNome());
+                edtTempo.setText(receita.getTempo());
+                edtIngredientes.setText(receita.getIngredientes());
+
+                checkFavorita.setChecked(receita.isFavorita());
+
+                Toast.makeText(MainActivity.this,
+                        "Modo edição",
+                        Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onLongClick(Receita receita) {
+
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Excluir")
+                        .setMessage("Deseja excluir?")
+                        .setPositiveButton("Sim", (dialog, which) -> {
+
+                            db.collection("receitas")
+                                    .document(receita.getId())
+                                    .delete();
+
+                            listarReceitas();
+
+                            Toast.makeText(MainActivity.this,
+                                    "Excluída",
+                                    Toast.LENGTH_SHORT).show();
+
+                        })
+
+                        .setNegativeButton("Não", null)
+                        .show();
+            }
+        });
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
+
         recyclerView.setAdapter(adapter);
 
-        String[] categorias = {"Doce", "Salgada", "Bebida"};
+        String[] categorias = {
+                "Doce",
+                "Salgada",
+                "Bebida",
+                "Massa",
+                "Sobremesa"
+        };
 
-        ArrayAdapter<String> adapterCategoria =
-                new ArrayAdapter<>(this,
-                        android.R.layout.simple_spinner_dropdown_item,
-                        categorias);
+        spCategoria.setAdapter(new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_dropdown_item,
+                categorias
+        ));
 
-        spCategoria.setAdapter(adapterCategoria);
+        String[] dificuldades = {
+                "Fácil",
+                "Médio",
+                "Difícil"
+        };
 
-        String[] dificuldades = {"Fácil", "Médio", "Difícil"};
+        spDificuldade.setAdapter(new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_dropdown_item,
+                dificuldades
+        ));
 
-        ArrayAdapter<String> adapterDificuldade =
-                new ArrayAdapter<>(this,
-                        android.R.layout.simple_spinner_dropdown_item,
-                        dificuldades);
+        String[] filtroCategorias = {
+                "Todas",
+                "Doce",
+                "Salgada",
+                "Bebida",
+                "Massa",
+                "Sobremesa"
+        };
 
-        spDificuldade.setAdapter(adapterDificuldade);
+        spFiltroCategoria.setAdapter(new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_dropdown_item,
+                filtroCategorias
+        ));
+
+        spFiltroCategoria.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+
+            @Override
+            public void onItemSelected(AdapterView<?> parent,
+                                       View view,
+                                       int position,
+                                       long id) {
+
+                listarReceitas();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
 
         btnSalvar.setOnClickListener(v -> salvarReceita());
 
@@ -87,57 +181,186 @@ public class MainActivity extends AppCompatActivity {
 
     private void salvarReceita() {
 
-        String nome = edtNome.getText().toString();
-        String tempo = edtTempo.getText().toString();
-        String ingredientes = edtIngredientes.getText().toString();
+        String nome = edtNome.getText().toString().trim();
 
-        if(nome.isEmpty()){
+        String tempo = edtTempo.getText().toString().trim();
+
+        String ingredientes = edtIngredientes.getText().toString().trim();
+
+        if (nome.isEmpty()) {
+
             edtNome.setError("Digite o nome");
+
+            return;
+        }
+
+        if (tempo.isEmpty()) {
+
+            edtTempo.setError("Digite o tempo");
+
+            return;
+        }
+
+        if (ingredientes.isEmpty()) {
+
+            edtIngredientes.setError("Digite ingredientes");
+
             return;
         }
 
         Map<String, Object> receita = new HashMap<>();
 
         receita.put("nome", nome);
-        receita.put("categoria", spCategoria.getSelectedItem().toString());
+
+        receita.put("categoria",
+                spCategoria.getSelectedItem().toString());
+
         receita.put("tempo", tempo);
+
         receita.put("ingredientes", ingredientes);
-        receita.put("dificuldade", spDificuldade.getSelectedItem().toString());
-        receita.put("favorita", checkFavorita.isChecked());
 
-        db.collection("receitas")
-                .add(receita)
-                .addOnSuccessListener(documentReference -> {
+        receita.put("dificuldade",
+                spDificuldade.getSelectedItem().toString());
 
-                    Toast.makeText(this,
-                            "Receita salva",
-                            Toast.LENGTH_SHORT).show();
+        receita.put("favorita",
+                checkFavorita.isChecked());
 
-                    listarReceitas();
-                });
+        if (!idSelecionado.isEmpty()) {
+
+            db.collection("receitas")
+                    .document(idSelecionado)
+                    .update(receita)
+
+                    .addOnSuccessListener(unused -> {
+
+                        Toast.makeText(this,
+                                "Atualizada",
+                                Toast.LENGTH_SHORT).show();
+
+                        limparCampos();
+
+                        listarReceitas();
+
+                        idSelecionado = "";
+                    });
+
+        } else {
+
+            db.collection("receitas")
+                    .add(receita)
+
+                    .addOnSuccessListener(documentReference -> {
+
+                        Toast.makeText(this,
+                                "SALVOU NO FIREBASE",
+                                Toast.LENGTH_LONG).show();
+
+                        limparCampos();
+
+                        listarReceitas();
+                    })
+
+                    .addOnFailureListener(e -> {
+
+                        Toast.makeText(this,
+                                "ERRO: " + e.getMessage(),
+                                Toast.LENGTH_LONG).show();
+                    });
+        }
     }
 
-    private void listarReceitas(){
+    private void listarReceitas() {
 
-        db.collection("receitas")
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
+        String filtro =
+                spFiltroCategoria.getSelectedItem().toString();
 
-                    lista.clear();
+        if (filtro.equals("Todas")) {
 
-                    for(var doc : queryDocumentSnapshots){
+            db.collection("receitas")
+                    .get()
 
-                        Receita r = new Receita();
+                    .addOnSuccessListener(queryDocumentSnapshots -> {
 
-                        r.setId(doc.getId());
-                        r.setNome(doc.getString("nome"));
-                        r.setCategoria(doc.getString("categoria"));
-                        r.setTempo(doc.getString("tempo"));
+                        lista.clear();
 
-                        lista.add(r);
-                    }
+                        for (var doc : queryDocumentSnapshots) {
 
-                    adapter.notifyDataSetChanged();
-                });
+                            Receita r = new Receita();
+
+                            r.setId(doc.getId());
+
+                            r.setNome(doc.getString("nome"));
+
+                            r.setCategoria(doc.getString("categoria"));
+
+                            r.setTempo(doc.getString("tempo"));
+
+                            r.setIngredientes(doc.getString("ingredientes"));
+
+                            r.setDificuldade(doc.getString("dificuldade"));
+
+                            Boolean fav =
+                                    doc.getBoolean("favorita");
+
+                            r.setFavorita(fav != null && fav);
+
+                            lista.add(r);
+                        }
+
+                        adapter.notifyDataSetChanged();
+                    });
+
+        } else {
+
+            db.collection("receitas")
+                    .whereEqualTo("categoria", filtro)
+                    .get()
+
+                    .addOnSuccessListener(queryDocumentSnapshots -> {
+
+                        lista.clear();
+
+                        for (var doc : queryDocumentSnapshots) {
+
+                            Receita r = new Receita();
+
+                            r.setId(doc.getId());
+
+                            r.setNome(doc.getString("nome"));
+
+                            r.setCategoria(doc.getString("categoria"));
+
+                            r.setTempo(doc.getString("tempo"));
+
+                            r.setIngredientes(doc.getString("ingredientes"));
+
+                            r.setDificuldade(doc.getString("dificuldade"));
+
+                            Boolean fav =
+                                    doc.getBoolean("favorita");
+
+                            r.setFavorita(fav != null && fav);
+
+                            lista.add(r);
+                        }
+
+                        adapter.notifyDataSetChanged();
+                    });
+        }
+    }
+
+    private void limparCampos() {
+
+        edtNome.setText("");
+
+        edtTempo.setText("");
+
+        edtIngredientes.setText("");
+
+        checkFavorita.setChecked(false);
+
+        spCategoria.setSelection(0);
+
+        spDificuldade.setSelection(0);
     }
 }
